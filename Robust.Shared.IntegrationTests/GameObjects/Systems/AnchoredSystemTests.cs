@@ -77,6 +77,45 @@ namespace Robust.UnitTesting.Shared.GameObjects.Systems
             sim.System<MoveEventTestSystem>().AssertMoved(false);
         }
 
+        /// <summary>
+        /// Anchoring snaps an entity into the grid's tile coordinates without preserving its world position, so it
+        /// must not preserve its world rotation either — once anchored, the entity's orientation is grid-relative.
+        /// Regression test for anchored entities being skewed by the grid's rotation whenever anchoring also
+        /// reparents them. On a grid at rotation zero the skew is zero and the bug is invisible, which is why it
+        /// only shows up on grids that have been rotated.
+        /// </summary>
+        [Test]
+        public void OnAnchored_RotatedGrid_PreservesLocalRotation()
+        {
+            var (sim, grid, coordinates, xformSys, mapSys) = SimulationFactory();
+            var entMan = sim.Resolve<IEntityManager>();
+
+            // Park the grid at an angle that is not a multiple of 90, the way a shuttle ends up after moving.
+            xformSys.SetWorldRotation(grid.Owner, Angle.FromDegrees(85));
+
+            var tileIndices = mapSys.TileIndicesFor(grid, coordinates);
+            mapSys.SetTile(grid, tileIndices, new Tile(1));
+
+            // Spawn parented to the map rather than the grid, so that anchoring performs a reparent.
+            var mapEnt = mapSys.GetMap(coordinates.MapId);
+            var ent = entMan.SpawnEntity(null, new EntityCoordinates(mapEnt, new Vector2(50, 50)));
+            var xform = entMan.GetComponent<TransformComponent>(ent);
+
+            xformSys.SetLocalRotation(ent, Angle.FromDegrees(90), xform);
+            Assert.That(xform.ParentUid, Is.EqualTo(mapEnt), "entity should start parented to the map");
+
+            // Act
+            xformSys.AnchorEntity((ent, xform), grid, tileIndices);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(xform.Anchored, Is.True);
+                Assert.That(xform.ParentUid, Is.EqualTo(grid.Owner), "anchoring reparents onto the grid");
+                Assert.That(xform.LocalRotation.Degrees, Is.EqualTo(90).Within(0.01),
+                    "anchoring must keep the entity's grid-local rotation, not rewrite it to preserve world rotation");
+            });
+        }
+
         [ComponentProtoName("AnchorOnInit")]
         [Reflect(false)]
         private sealed partial class AnchorOnInitComponent : Component;

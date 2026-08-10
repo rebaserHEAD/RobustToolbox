@@ -94,8 +94,17 @@ public abstract partial class SharedTransformSystem
         }
 
         // Anchor snapping. If there is a coordinate change, it will dirty the component for us.
+        //
+        // The rotation is passed explicitly so that it is treated as grid-local, matching how the position is
+        // handled directly above: the entity is snapped into the grid's tile coordinates without preserving its
+        // world position, so preserving its world *rotation* would be inconsistent. Leaving the rotation null
+        // makes SetCoordinates take its preserve-world-rotation path whenever anchoring also reparents the
+        // entity (e.g. anchoring out of a container, or off the map onto a grid), which rewrites the local
+        // rotation to localRotation + worldRot(oldParent) - worldRot(newParent). On a grid whose world rotation
+        // is zero that difference is zero and the bug is invisible; on a rotated grid it silently skews every
+        // entity that anchors through this path by the grid's rotation.
         var pos = new EntityCoordinates(grid, _map.GridTileToLocal(grid, grid, tileIndices).Position);
-        SetCoordinates((uid, xform, meta), pos, unanchor: false);
+        SetCoordinates((uid, xform, meta), pos, rotation: xform.LocalRotation, unanchor: false);
         return true;
     }
 
