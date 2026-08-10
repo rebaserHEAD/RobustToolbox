@@ -85,13 +85,24 @@ namespace Robust.UnitTesting.Shared.GameObjects.Systems
         /// only shows up on grids that have been rotated.
         /// </summary>
         [Test]
-        public void OnAnchored_RotatedGrid_PreservesLocalRotation()
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(5)]
+        [TestCase(10)]
+        [TestCase(15)]
+        [TestCase(30)]
+        [TestCase(45)]
+        [TestCase(60)]
+        [TestCase(85)]
+        [TestCase(90)]
+        public void OnAnchored_RotatedGrid_PreservesLocalRotation(double gridDegrees)
         {
             var (sim, grid, coordinates, xformSys, mapSys) = SimulationFactory();
             var entMan = sim.Resolve<IEntityManager>();
 
-            // Park the grid at an angle that is not a multiple of 90, the way a shuttle ends up after moving.
-            xformSys.SetWorldRotation(grid.Owner, Angle.FromDegrees(85));
+            // Park the grid at an angle, the way a shuttle ends up after moving.
+            xformSys.SetWorldRotation(grid.Owner, Angle.FromDegrees(gridDegrees));
 
             var tileIndices = mapSys.TileIndicesFor(grid, coordinates);
             mapSys.SetTile(grid, tileIndices, new Tile(1));
